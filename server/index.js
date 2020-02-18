@@ -14,9 +14,78 @@ app.use(
   session({
     secret: SESSION_SECRET,
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24 * 7
+    }
   })
 );
+
+
+//difference between async/await and .then/.catch
+
+// function getStuff() {
+//   let data = axios.get('/api/signup').then((res) => { res.data }).catch(err => {})
+// }
+
+// async function getStuff() {
+//   let data = await axios.get('/api/signup')
+// }
+
+// request level middleware function
+function checkUser(req, res, next) {
+  console.log('hit checkUser')
+  if(req.session.user) {
+    res.status(200).send({message: 'A user is currently logged in. Logout if you wish to sign in to another account', user: req.session.user})
+  } else {
+    next()
+  }
+}
+
+//endpoints
+app.post('/auth/signup', checkUser, async (req, res) => {
+  console.log('hit signup')
+  let {email, password} = req.body
+  let db = req.app.get('db')
+
+  let userFound = await db.check_user_exists([email])
+  if (userFound[0]) {
+    return res.status(400).send('Email already exists')
+  }
+
+  let salt = bcrypt.genSaltSync(10)
+  let hash = bcrypt.hashSync(password, salt)
+  let createdUser = await db.create_user([email, hash])
+
+  req.session.user = {id: createdUser[0].id, email: createdUser[0].email}
+  res.status(200).send({ user:req.session.user })
+})
+
+app.post('/auth/login', checkUser, async (req, res) => {
+  console.log('hit login')
+  let {email, password} = req.body
+  let db = req.app.get('db')
+
+  let userFound = await db.check_user_exists([email])
+  if(!userFound[0]) {
+    res.status(400).send('Email not found, please try again.')
+  }
+
+  let authenticated = bcrypt.compareSync(password, userFound[0].user_password)
+
+  if(authenticated) {
+    req.session.user = {id: userFound[0].id, email: userFound[0].email}
+    res.status(200).send({ user:req.session.user })
+  } else {
+    res.status(401).send('Incorrect email/password')
+  }
+})
+
+app.delete('/auth/logout', (req, res) => {
+  req.session.destroy()
+  console.log('session destroyed')
+  res.sendStatus(200)
+})
 
 massive(CONNECTION_STRING).then(db => {
   app.set('db', db);
