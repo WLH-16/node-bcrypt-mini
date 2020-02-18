@@ -19,7 +19,7 @@ class App extends Component {
 
     this.setState({loggedInUser: result.data.user, email: '', password: ''})
 
-    if(result.message) alert(result.message)
+    if(result.data.message) alert(result.data.message)
   }
 
   async signup() {
@@ -29,7 +29,8 @@ class App extends Component {
 
     this.setState({loggedInUser: result.data.user, email: '', password: ''})
 
-    if(result.message) alert(result.message)
+    console.log('hit signup', result)
+    if(result.data.message) alert(result.data.message)
   }
 
   async logout() {
